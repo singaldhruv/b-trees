@@ -5,16 +5,17 @@ import os
 fileCounter = 0
 
 class Node:
-    nodeNo = 0
-    keys = []
-    children = []
-    parent = 0
-    next = 0
-    prev = 0
-    leaf = False
 
     #Create a node object by reading from the file
     def __init__(self,nodeNo):
+        self.nodeNo = 0
+        self.keys = []
+        self.children = []
+        self.parent = 0
+        self.next = 0
+        self.prev = 0
+        self.leaf = False
+
         if not os.path.isfile("./data/"+str(nodeNo)+".dat"):
             error("ERROR, node %d data not found"%nodeNo)
         
@@ -61,19 +62,40 @@ class Node:
         
         global blockSize
         newDataNode = createDataNode([key],[data],self.nodeNo)
+        foundPlace = False
         for i in range(0,self.numKeys()):
             if self.keys[i]>key:
+                foundPlace = True
                 break
+
+        if not foundPlace:
+            i = self.numKeys()
+
         self.keys.insert(i,key)
         self.children.insert(i,newDataNode)
 
         if self.numKeys() < blockSize:
             self.writeToDisk()
-
+        #split the node and add key to parent and so on
         else:
-            #split the node and add key to parent and so on
-            a = 1
-    #
+            #split the key and children lists
+            keys1 = self.keys[0:blockSize/2]
+            keys2 = self.keys[blockSize/2+1:(self.numKeys())]
+            children1 = self.children[0:blockSize/2]
+            children2 = self.children[blockSize/2+1:(self.numKeys())]
+            #create a new tree node and set the referees accordingly
+            node2 = createTreeNode(keys2,children2,self.parent,self.next,self.nodeNo,self.isLeaf())
+            self.keys = keys1
+            self.children = children1
+            if self.next!=0:
+                setNodePrev(self.next,node2)
+            self.next = node2
+            self.writeToDisk()
+            exit()
+            #update the parent recursively
+            
+
+        #def addKeyToTreeNode(self,nodeNo,key,child
     #Write back the node data to disk
     def writeToDisk(self):
         with open("data/"+str(self.nodeNo)+".dat",'w+') as nodeFile:
@@ -94,7 +116,8 @@ class Node:
                 nodeFile.write("0")
                     
 
-def createTreeNode(keys,children,parent):
+#Create a tree node with given values
+def createTreeNode(keys,children,parent,next,prev,leaf):
     if len(keys) != len(children):
         error("Wrong keys/children set provided for the data node by %d"%parent)
     global fileCounter
@@ -103,14 +126,21 @@ def createTreeNode(keys,children,parent):
     nodeName = str(nodeNo) + ".dat"
 
     with open("data/"+nodeName,'w+') as nodeFile:
-        nodeFile.write("node\n")
+        nodeFile.write("node %d\n"%nodeNo)
         nodeFile.write("keys")
         for key in keys:
             nodeFile.write(" "+str(key))
         nodeFile.write("\nchildren")
         for child in children:
             nodeFile.write(" "+str(child))
-        nodeFile.write("\nparent "+str(parent)+"\n")
+        nodeFile.write("\nparent %d"%parent)
+        nodeFile.write("\nnext %d"%next)
+        nodeFile.write("\nprev %d"%prev)
+        if leaf:
+            nodeFile.write("\nleaf 1")
+        else:
+            nodeFile.write("\nleaf 0")
+
     return nodeNo
 
 
@@ -129,8 +159,6 @@ def createDataNode(keys,data,parent):
         dataFile.write("parent " + str(parent)+"\n")
     return dataNodeNo
     
-
-
 
 #Create a new B-plus tree with the first pair of key and data
 def createTree(key,data):
@@ -162,7 +190,12 @@ def createTree(key,data):
     
 
 
-
+#Set prev parameter of the given node
+def setNodePrev(nodeNo,prev):
+    node = Node(nodeNo)
+    node.prev = prev
+    node.writeToDisk()
+    return
 
 
 #Print the error message and exit
@@ -195,4 +228,4 @@ if __name__ == "__main__":
             currdata = currline.split()[1]
             node.addDataToLeaf(float(currkey),currdata)
     
-        node.printValues()
+        #node.printValues()
