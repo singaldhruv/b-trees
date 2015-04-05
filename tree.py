@@ -43,6 +43,7 @@ class Node:
 
     #Prints all the values of the node
     def printValues(self):
+        print "******NODE********"
         print "nodeNo: ",self.nodeNo
         print "keys: ",self.keys
         print "children: ", self.children
@@ -50,8 +51,8 @@ class Node:
         print "next: ",self.next
         print "prev: ",self.prev
         print "isLeaf: ",self.isLeaf()
-        print "isRoot: ",self.isRoot()
-        print "\n",
+        print "isRoot: ",
+        print self.isRoot()
 
     #Returns the number of keys in the tree node
     def numKeys(self):
@@ -96,24 +97,7 @@ class Node:
 
         #split the node and add key to parent and so on
         else:
-            #split the key and children lists
-            keys1 = self.keys[0:blockSize/2]
-            keys2 = self.keys[blockSize/2+1:(self.numKeys())]
-            children1 = self.children[0:blockSize/2]
-            children2 = self.children[blockSize/2+1:(self.numKeys())]
-            #create a new tree node and set the referees accordingly
-            newNode = createTreeNode(keys2,children2,self.parent,self.next,self.nodeNo,self.isLeaf())
-            for child in children2:
-                updateDataNodeParent(child,newNode)
-
-            self.keys = keys1
-            self.children = children1
-            if self.next!=0:
-                updatePrev(self.next,newNode)
-            self.next = newNode
-            self.writeToDisk()
-            #update the parent recursively
-            splitRec(self.parent,self.nodeNo,newNode)
+            splitRec(self.nodeNo)
 
     #Write back the node data to disk
     def writeToDisk(self):
@@ -211,38 +195,28 @@ def updatePrev(nodeNo,prev):
     node.writeToDisk()
     return
 
-#Set parent parameter of the given node
-def updateParent(nodeNo,parent):
-    node = Node(nodeNo)
-    node.parent = parent
-    node.writeToDisk()
-    return
 
-def updateDataNodeParent(nodeNo,parent):
+#Update the parent of a node, generally after the old parent split
+def updateParent(nodeNo,parent):
     if not os.path.isfile("./data/%d.dat"%nodeNo):
         error("ERROR, node %d data not found"%nodeNo)
         
     lines = open("data/%d.dat"%nodeNo).readlines()
-    if lines[0].split()[0] != 'data':
-        error("ERROR, file %d.dat is not a data node"%nodeNo) 
 
     for line in lines:
         if line.split()[0]=='parent':
-            lines[lines.index(line)]="parent %d"%parent
+            lines[lines.index(line)]="parent %d\n"%parent
 
     open("data/%d.dat"%nodeNo,'w').writelines(lines)
 
 
-#Update the key for the nodes recursively
+#Update the key for the nodes in the tree recursively, till root
 def updateRec(parent,node):
     if parent == 0:
         return
     par = Node(parent)
     nod = Node(parent)
     i = par.children.index(node)
-    for i in range(0,par.numKeys()):
-        if par.children[i]==node:
-            break
         
     par.updateKey(i,nod.maxKey())
     par.writeToDisk()
@@ -251,64 +225,60 @@ def updateRec(parent,node):
         updateRec(par.parent,parent,key)
 
 
+#Split the node with more keys than the allowed blockSize, and do so recursively till root is reached
+def splitRec(node):
+    global blockSize
+    nod1 = Node(node)
+    #split the key and children lists
+    keys1 = nod1.keys[0:blockSize/2]
+    keys2 = nod1.keys[blockSize/2+1:(nod1.numKeys())]
+    children1 = nod1.children[0:blockSize/2]
+    children2 = nod1.children[blockSize/2+1:(nod1.numKeys())]
 
-#Split the node recursively to the top
-def splitRec(parent,node1,node2):
+    #create a new tree node and set the referees accordingly
+    newNode = createTreeNode(keys2,children2,nod1.parent,nod1.next,nod1.nodeNo,nod1.isLeaf())
+        
+ 
+    for child in children2:
+        updateParent(child,newNode)
 
-    if parent==0:
-        #Base case, completed processing the top
-        #Create a new root adding the node addresses of the two new nodes and update the parent pointers of node1 and node2s
-        nodeObject1 = Node(node1)
-        nodeObject2 = Node(node2)
-        key1 = nodeObject1.maxKey()
-        key2 = nodeObject2.maxKey()
+    nod1.keys = keys1
+    nod1.children = children1
 
+    if nod1.next!=0:
+        updatePrev(nod1.next,newNode)
+    nod1.next = newNode
+    nod1.writeToDisk()
+
+    nod2 = Node(newNode)
+    key1 = nod1.maxKey()
+    key2 = nod2.maxKey()
+
+    if nod1.isRoot():
+        #This node is the root. Create a new root
         global tree
-        tree = createTreeNode([key1,key2],[node1,node2],0,0,0,False)
-        updateParent(node1,tree)
-        updateParent(node2,tree)
+        tree = createTreeNode([key1,key2],[node,newNode],0,0,0,False)
+        updateParent(node,tree)
+        updateParent(newNode,tree)
+        return
 
     else:
-        #On a tree node (maybe root)
-        #Check if the node has enough space, if yes, just add the new node
-        #If not, split the node and call this function recursively
-        par = Node(parent)
-        nodeObject1 = Node(node1)
-        nodeObject2 = Node(node2)
-        key1 = nodeObject1.maxKey()
-        key2 = nodeObject2.maxKey()
-        
-        global blockSize
-        i = 0
-        i = par.children.index(node1)
-        for i in range(0,par.numKeys()):
-            if par.children[i]==node1:
-                break
-
+        par = Node(nod1.parent)
+        i = par.children.index(node)
+        par.updateKey(i,key1)
         par.keys.insert(i+1,key2)
-        par.children.insert(i+1,node2)
+        par.children.insert(i+1,newNode)
 
         if par.numKeys() <= blockSize:
             par.writeToDisk()
             #Update the key in the path from root to this leaf
-            #updateRec(par.parent,par.nodeNo,par.maxKey())
-
+            if i==(par.numKeys()-1):
+                updateRec(par.parent,par.nodeNo)
+            return
+        #Split this node recursively too
         else:
-            #Split the parent too, and call this routine recursively
-            keys1 = par.keys[0:blockSize/2]
-            keys2 = par.keys[blockSize/2+1:(par.numKeys())]
-            children1 = par.children[0:blockSize/2]
-            children2 = par.children[blockSize/2+1:(par.numKeys())]
-            #create a new tree node and set the referees accordingly
-            newNode = createTreeNode(keys2,children2,par.parent,par.next,par.nodeNo,par.isLeaf())
-            par.keys = keys1
-            par.children = children1
-            if par.next!=0:
-                updatePrev(par.next,newNode)
-            par.next = newNode
-            par.writeToDisk()
-            #update the parent recursively
-            splitRec(par.parent,par.nodeNo,newNode)
+            splitRec(nod1.parent)
+
 
 #Find the leaf node at which insertion will take place
 #IMPORTANT: The rule to use is that the child indexed by i, contains elements which have keys which are less than or equal to the key at i
@@ -351,8 +321,6 @@ if __name__ == "__main__":
         for currline in lines[1:]:
             currkey = currline.split()[0]
             currdata = currline.split()[1]
-            currNode = Node(findLeaf(currkey))
+            currNode = Node(findLeaf(float(currkey)))
             currNode.addDataToLeaf(float(currkey),currdata)
-    
-        Node(tree).printValues()
-        Node(36).printValues()
+        
