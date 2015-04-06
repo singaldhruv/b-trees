@@ -154,7 +154,7 @@ def createDataNode(keys,data,parent):
     fileCounter += 1
     dataNodeNo = fileCounter
     with open("data/%d.dat"%dataNodeNo,'w+') as dataFile:
-        dataFile.write("data\n")
+        dataFile.write("data %d\n"%dataNodeNo)
         for i in range(0,len(keys)):
             dataFile.write(str(keys[i]) + " " + str(data[i])+"\n")
         dataFile.write("parent " + str(parent)+"\n")
@@ -296,6 +296,100 @@ def findLeaf(key):
         currNode = Node(curr)
     return curr
 
+
+#Function to wrap around insertion operation
+def insert(key,data):
+    currNode = Node(findLeaf(key))
+    currNode.addDataToLeaf(key,data)
+    return
+
+
+#Function for point query operation. 
+def pointQuery(key):
+    data = []
+    #Get the first data node with its key greater than 'key'
+    currNode = Node(findLeaf(key))
+    i = 0
+    for i in range(0,currNode.numKeys()):
+        currKey = currNode.keys[i]
+        if currKey > key:
+            break
+    
+    currKey = currNode.keys[i]
+
+    while not currKey < key:
+        if currKey == key:
+            #Get data from the data node and append it to the return list
+            data.extend(getData(currNode.children[i]))
+
+        if i != 0:
+            i -= 1
+            currKey = currNode.keys[i]
+        else:
+            if currNode.prev == 0:
+                break
+            else:
+                currNode = Node(currNode.prev)
+                i = currNode.numKeys()-1
+                currKey = currNode.keys[i]
+
+    return data
+
+
+#Function for range query, similar to the point query function
+def rangeQuery(center,limit):
+    data = {}
+    
+    #Get the first data node with its key greater than 'key'
+    currNode = Node(findLeaf(center+limit))
+    i = 0
+    for i in range(0,currNode.numKeys()):
+        currKey = currNode.keys[i]
+        if currKey > center+limit:
+            break
+    
+    currKey = currNode.keys[i]
+
+    while not currKey < center-limit:
+        if currKey <= center+limit and currKey >= center-limit:
+            #Get data from the data node and append it to the return list
+            if currNode.keys[i] in data:
+                data[currNode.keys[i]].extend(getData(currNode.children[i]))
+            else:
+                data[currNode.keys[i]] = []
+                data[currNode.keys[i]].extend(getData(currNode.children[i]))
+
+        if i != 0:
+            i -= 1
+            currKey = currNode.keys[i]
+        else:
+            if currNode.prev == 0:
+                break
+            else:
+                currNode = Node(currNode.prev)
+                i = currNode.numKeys()-1
+                currKey = currNode.keys[i]
+
+    return data
+    
+
+#Function to take a data node and return the data contained in it as a list
+def getData(dataNodeNo):
+    if not os.path.isfile("./data/%d.dat"%dataNodeNo):
+        error("ERROR, node %d data not found"%dataNodeNo)
+        
+    lines = open("data/%d.dat"%dataNodeNo).readlines()
+    
+    if lines[0].split()[0]!='data':
+        error("ERROR, node %d not a data node"%dataNodeNo)
+
+    data = []
+    for line in lines[1:]:
+        if line.split()[0]!='parent':
+            data.append(line.split()[1])
+    
+    return data
+
 #Print the error message and exit
 def error(errorString):
     print errorString
@@ -319,8 +413,17 @@ if __name__ == "__main__":
         tree = createTree(currkey,currdata)
 
         for currline in lines[1:]:
-            currkey = currline.split()[0]
+            currkey = float(currline.split()[0])
             currdata = currline.split()[1]
-            currNode = Node(findLeaf(float(currkey)))
-            currNode.addDataToLeaf(float(currkey),currdata)
-        
+            insert(currkey,currdata)
+
+    with open("querysample.txt") as queryfile:
+        lines = queryfile.readlines()
+        for line in lines:
+            if line.split()[0] == '0':
+                insert(float(line.split()[1]),line.split()[2])
+            elif line.split()[0] == '1':
+                pointQuery(float(line.split()[1]))
+            elif line.split()[0] == '2':
+                rangeQuery(float(line.split()[1]),float(line.split()[2]))
+            
