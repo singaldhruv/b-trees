@@ -1,13 +1,65 @@
 #Code for the second assignment of CS315
 #Dhruv Singal 12243
 import os
+import datetime
+import math
 
-fileCounter = 0
+
+class StatsAggregator:
+    def __init__(self):
+        self.max = 0
+        self.min = 0
+        self.num = 0
+        self.sum = 0
+        self.sumSquare = 0
+    
+    def average(self):
+        if self.num == 0:
+            return 0
+
+        return self.sum/self.num
+
+    def deviation(self):
+        if self.num == 0:
+            return 0
+
+        return math.sqrt((self.sumSquare/self.num) - (self.average())*(self.average()))
+
+    def update(self,value):
+        self.num += 1
+        self.sum+=value
+        self.sumSquare+=value*value
+    
+        if self.num == 1:
+            self.max = value
+            self.min = value
+            return
+
+        if self.max < value:
+            self.max = value
+
+        if self.min > value:
+            self.min = value
+
+        return
+
+
+    def printStats(self):
+        print "Max: %d"%self.max
+        print "Min: %d"%self.min
+        print "Average: %d"%self.average()
+        print "Standard Deviation: %d"%self.deviation()
+
+
+
 
 class Node:
 
     #Create a node object by reading from the file
     def __init__(self,nodeNo):
+        global currentAccessCounter
+        currentAccessCounter += 1
+
         self.nodeNo = 0
         self.keys = []
         self.children = []
@@ -121,6 +173,9 @@ class Node:
 
 #Create a tree node with given values
 def createTreeNode(keys,children,parent,next,prev,leaf):
+    global currentAccessCounter
+    currentAccessCounter += 1
+
     if len(keys) != len(children):
         error("Wrong keys/children set provided for the data node by %d"%parent)
     global fileCounter
@@ -148,6 +203,9 @@ def createTreeNode(keys,children,parent,next,prev,leaf):
 
 #Create a data node with a root node of the tree as the parent
 def createDataNode(keys,data,parent):
+    global currentAccessCounter
+    currentAccessCounter += 1
+
     if len(keys) != len(data):
         error("Wrong keys/data set provided for the data node by %d"%parent)
     global fileCounter
@@ -163,6 +221,9 @@ def createDataNode(keys,data,parent):
 
 #Create a new B-plus tree with the first pair of key and data
 def createTree(key,data):
+    global currentAccessCounter
+    currentAccessCounter += 1
+
     global fileCounter
     fileCounter += 1
     nodeNo = fileCounter
@@ -291,7 +352,7 @@ def findLeaf(key):
         for i in range(0,currNode.numKeys()):
             if currNode.keys[i]>key:
                 break
-
+        
         curr = currNode.children[i]
         currNode = Node(curr)
     return curr
@@ -375,6 +436,9 @@ def rangeQuery(center,limit):
 
 #Function to take a data node and return the data contained in it as a list
 def getData(dataNodeNo):
+    global currentAccessCounter
+    currentAccessCounter += 1
+
     if not os.path.isfile("./data/%d.dat"%dataNodeNo):
         error("ERROR, node %d data not found"%dataNodeNo)
         
@@ -397,6 +461,12 @@ def error(errorString):
 
 
 if __name__ == "__main__":
+    global fileCounter
+    global currentAccessCounter
+
+    fileCounter = 0
+    currentAccessCounter = 0
+
     if not os.path.exists("./data"):
         os.makedirs("./data")
 
@@ -404,7 +474,8 @@ if __name__ == "__main__":
         global blockSize
         blockSize = int(config.readline())        
 
-    with open("sampledata.txt") as datafile:
+    with open("assgn2_bplus_data.txt") as datafile:
+#    with open("sampledata.txt") as datafile:
         lines = datafile.readlines()
         currline = lines[0]
         currkey = currline.split()[0]
@@ -417,13 +488,58 @@ if __name__ == "__main__":
             currdata = currline.split()[1]
             insert(currkey,currdata)
 
+    insertTimeStats = StatsAggregator()
+    insertAccessStats = StatsAggregator()
+    pointQueryTimeStats = StatsAggregator()
+    pointQueryAccessStats = StatsAggregator()
+    rangeQueryTimeStats = StatsAggregator()
+    rangeQueryAccessStats = StatsAggregator()
+
     with open("querysample.txt") as queryfile:
         lines = queryfile.readlines()
         for line in lines:
             if line.split()[0] == '0':
+                currentAccessCounter = 0
+                before = datetime.datetime.now()
                 insert(float(line.split()[1]),line.split()[2])
+                after = datetime.datetime.now()
+                insertTimeStats.update((after - before).microseconds)
+                insertAccessStats.update(currentAccessCounter)
+                
             elif line.split()[0] == '1':
+                currentAccessCounter = 0
+                before = datetime.datetime.now()
                 pointQuery(float(line.split()[1]))
+                after = datetime.datetime.now()
+                pointQueryTimeStats.update((after - before).microseconds)
+                pointQueryAccessStats.update(currentAccessCounter)
+
             elif line.split()[0] == '2':
+                currentAccessCounter = 0
+                before = datetime.datetime.now()
                 rangeQuery(float(line.split()[1]),float(line.split()[2]))
-            
+                after = datetime.datetime.now()
+                rangeQueryTimeStats.update((after - before).microseconds)
+                rangeQueryAccessStats.update(currentAccessCounter)
+
+
+    print "\n***************************"
+    print "Stats for insert operation"
+    print "TIME:"
+    insertTimeStats.printStats()
+    print "DISK ACCESS:"
+    insertAccessStats.printStats()
+
+    print "\n***************************"
+    print "Stats for point query operation"
+    print "TIME:"
+    pointQueryTimeStats.printStats()
+    print "DISK ACCESS:"
+    pointQueryAccessStats.printStats()
+
+    print "\n***************************"
+    print "Stats for range query operation"
+    print "TIME:"
+    rangeQueryTimeStats.printStats()
+    print "DISK ACCESS:"
+    rangeQueryAccessStats.printStats()
