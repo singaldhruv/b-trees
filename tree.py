@@ -5,6 +5,7 @@ import datetime
 import math
 
 
+
 class StatsAggregator:
     def __init__(self):
         self.max = 0
@@ -17,13 +18,13 @@ class StatsAggregator:
         if self.num == 0:
             return 0
 
-        return self.sum/self.num
+        return float(float(self.sum)/float(self.num))
 
     def deviation(self):
         if self.num == 0:
             return 0
 
-        return math.sqrt((self.sumSquare/self.num) - (self.average())*(self.average()))
+        return math.sqrt((float(self.sumSquare)/float(self.num)) - (self.average())*(self.average()))
 
     def update(self,value):
         self.num += 1
@@ -47,8 +48,8 @@ class StatsAggregator:
     def printStats(self):
         print "Max: %d"%self.max
         print "Min: %d"%self.min
-        print "Average: %d"%self.average()
-        print "Standard Deviation: %d"%self.deviation()
+        print "Average: %f"%self.average()
+        print "Standard Deviation: %f"%self.deviation()
 
 
 
